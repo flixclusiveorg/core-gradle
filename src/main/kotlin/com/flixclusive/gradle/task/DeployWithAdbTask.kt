@@ -17,7 +17,6 @@ package com.flixclusive.gradle.task
 
 import com.android.build.gradle.BaseExtension
 import com.flixclusive.gradle.getFlixclusive
-import com.flixclusive.gradle.util.buildValidFilename
 import com.flixclusive.model.provider.Repository.Companion.toValidRepositoryLink
 import org.gradle.api.DefaultTask
 import org.gradle.api.tasks.AbstractCopyTask
@@ -51,7 +50,7 @@ internal abstract class DeployWithAdbTask : DefaultTask() {
         val devices = jadbConnection.devices.filter {
             try {
                 it.state == JadbDevice.State.Device
-            } catch (e: JadbException) {
+            } catch (_: JadbException) {
                 false
             }
         }
@@ -109,7 +108,7 @@ internal abstract class DeployWithAdbTask : DefaultTask() {
                 sanitizedFolderName = folderName,
                 isDebug = isDebug
             )
-        } catch (e: JadbException) {
+        } catch (_: JadbException) {
             device.push(
                 files = listOf(providerFile, updaterJson),
                 sanitizedFolderName = folderName,

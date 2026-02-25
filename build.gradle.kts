@@ -1,10 +1,8 @@
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     `kotlin-dsl`
-    id("maven-publish")
+    `maven-publish`
 }
 
 java {
@@ -19,23 +17,18 @@ kotlin {
 }
 
 dependencies {
-    val agp = "8.7.3"
-    val coreStubs = "1.2.4"
-    val kotlin = "2.0.21"
-    val shadow = "9.0.0-beta4"
-
     compileOnly(gradleApi())
-    compileOnly("com.google.guava:guava:30.1.1-jre")
-    compileOnly("com.android.tools:sdk-common:31.0.0")
-    compileOnly("com.android.tools.build:gradle:$agp")
-    compileOnly("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin")
+    compileOnly(libs.guava)
+    compileOnly(libs.android.tools.sdk)
+    compileOnly(libs.android.tools.gradle)
+    compileOnly(libs.kotlin.gradle.plugin)
 
-    implementation("org.ow2.asm:asm:9.4")
-    implementation("org.ow2.asm:asm-tree:9.4")
-    implementation("com.github.vidstige:jadb:master-SNAPSHOT")
-    implementation("com.github.flixclusiveorg.core-stubs:model-provider:$coreStubs")
-    implementation("com.gradleup.shadow:shadow-gradle-plugin:$shadow")
-    implementation("org.jetbrains.kotlin:compose-compiler-gradle-plugin:$kotlin")
+    implementation(libs.asm)
+    implementation(libs.asm.tree)
+    implementation(libs.jadb)
+    implementation(libs.coreStubs.model.provider)
+    implementation(libs.compose.compiler.gradle.plugin)
+    implementation(libs.shadow.gradle.plugin)
 }
 
 gradlePlugin {
@@ -53,7 +46,7 @@ val sourcesJar = tasks.register<Jar>("sourcesJar") {
 }
 
 group = "com.github.flixclusive"
-version = "1.2.7"
+version = "1.2.8"
 
 publishing {
     repositories {

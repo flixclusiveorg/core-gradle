@@ -4,6 +4,8 @@ import com.android.build.api.dsl.CommonExtension
 import org.gradle.api.JavaVersion
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.withType
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 internal fun Project.configureAndroid(
     commonExtension: CommonExtension<*, *, *, *, *, *>,
@@ -31,9 +33,9 @@ internal fun Project.configureAndroid(
             targetCompatibility = JavaVersion.VERSION_17
         }
 
-        tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-            kotlinOptions {
-                jvmTarget = JavaVersion.VERSION_17.toString() // Required
+        tasks.withType<KotlinCompile>().configureEach {
+            compilerOptions {
+                jvmTarget.set(JvmTarget.JVM_17)
             }
         }
 
