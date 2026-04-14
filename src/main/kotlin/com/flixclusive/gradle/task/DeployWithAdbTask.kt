@@ -15,12 +15,13 @@
 
 package com.flixclusive.gradle.task
 
-import com.android.build.gradle.BaseExtension
 import com.flixclusive.gradle.getFlixclusive
+import com.flixclusive.gradle.util.androidComponents
 import com.flixclusive.model.provider.Repository.Companion.toValidRepositoryLink
 import org.gradle.api.DefaultTask
-import org.gradle.api.tasks.AbstractCopyTask
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.options.Option
 import se.vidstige.jadb.AdbServerLauncher
@@ -41,11 +42,19 @@ internal abstract class DeployWithAdbTask : DefaultTask() {
     @set:Option(option = "debug-app", description = "Load the provider on the debug app")
     var debugApp: Boolean = false
 
+    @get:InputFile
+    abstract val providerFile: RegularFileProperty
+
+    @get:InputFile
+    abstract val updaterJsonFile: RegularFileProperty
+
     @TaskAction
     fun deployWithAdb() {
-        val android = project.extensions.getByName("android") as BaseExtension
+        val androidComponents = project.androidComponents
+        val sdkComponents = androidComponents.sdkComponents
+        val adbExecutable = sdkComponents.adb.get().asFile.absolutePath
 
-        AdbServerLauncher(Subprocess(), android.adbExecutable.absolutePath).launch()
+        AdbServerLauncher(Subprocess(), adbExecutable).launch()
         val jadbConnection = JadbConnection()
         val devices = jadbConnection.devices.filter {
             try {
@@ -61,7 +70,7 @@ internal abstract class DeployWithAdbTask : DefaultTask() {
 
         val device = devices[0]
 
-        if (!pushProviderToLocalStorage(device, debugApp)) {
+        if (!pushProviderToLocalStorage(device)) {
             return
         }
 
@@ -87,12 +96,9 @@ internal abstract class DeployWithAdbTask : DefaultTask() {
     }
 
 
-    private fun pushProviderToLocalStorage(device: JadbDevice, isDebug: Boolean): Boolean {
-        val makeTask = project.tasks.getByName("make") as AbstractCopyTask
-        val generateUpdaterJsonTask = project.rootProject.tasks.getByName("generateUpdaterJson")
-
-        val providerFile = makeTask.outputs.files.singleFile
-        val updaterJson = generateUpdaterJsonTask.outputs.files.singleFile
+    private fun pushProviderToLocalStorage(device: JadbDevice): Boolean {
+        val providerFile = providerFile.asFile.get()
+        val updaterJson = updaterJsonFile.asFile.get()
         val repository = project.extensions.getFlixclusive().repositoryUrl?.toValidRepositoryLink()
 
         if (repository == null) {
@@ -106,13 +112,13 @@ internal abstract class DeployWithAdbTask : DefaultTask() {
             device.push(
                 files = listOf(providerFile, updaterJson),
                 sanitizedFolderName = folderName,
-                isDebug = isDebug
+                isDebug = debugApp
             )
         } catch (_: JadbException) {
             device.push(
                 files = listOf(providerFile, updaterJson),
                 sanitizedFolderName = folderName,
-                isDebug = isDebug,
+                isDebug = debugApp,
                 useOldStorage = true
             )
         }

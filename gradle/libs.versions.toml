@@ -1,21 +1,19 @@
 [versions]
-agp = "8.13.2"
-androidTools = "31.13.0"
+agp = "9.1.1"
+androidTools = "32.1.1"
 asm = "9.9.1"
 coreStubs = "1.2.4"
-jadb = "master-SNAPSHOT"
+jadb = "-SNAPSHOT"
 guava = "30.1.1-jre"
-kotlin = "2.3.0"
-shadow = "9.0.0-rc1"
+kotlin = "2.3.20"
 
 [libraries]
 android-tools-sdk = { group = "com.android.tools", name = "sdk-common", version.ref = "androidTools" }
+android-sdklib = { module = "com.android.tools:sdklib", version.ref = "androidTools" }
 android-tools-gradle = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
-kotlin-gradle-plugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
 asm = { group = "org.ow2.asm", name = "asm", version.ref = "asm" }
 asm-tree = { group = "org.ow2.asm", name = "asm-tree", version.ref = "asm" }
 guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
 jadb = { group = "com.github.vidstige", name = "jadb", version.ref = "jadb" }
 coreStubs-model-provider = { group = "com.github.flixclusiveorg.core-stubs", name = "model-provider", version.ref = "coreStubs" }
-shadow-gradle-plugin = { group = "com.gradleup.shadow", name = "shadow-gradle-plugin", version.ref = "shadow" }
 compose-compiler-gradle-plugin = { group = "org.jetbrains.kotlin", name = "compose-compiler-gradle-plugin", version.ref = "kotlin" }

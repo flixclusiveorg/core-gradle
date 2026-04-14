@@ -1,10 +1,27 @@
 package com.flixclusive.gradle.util
 
-import com.flixclusive.model.provider.ProviderManifest
+import com.android.build.api.dsl.CommonExtension
+import com.android.build.api.dsl.LibraryExtension
+import com.android.build.api.variant.AndroidComponentsExtension
+import com.flixclusive.gradle.FlixclusiveProviderExtension
 import com.flixclusive.gradle.getFlixclusive
+import com.flixclusive.model.provider.ProviderManifest
 import com.flixclusive.model.provider.ProviderMetadata
 import org.gradle.api.Project
+import org.gradle.kotlin.dsl.getByName
 import java.security.MessageDigest
+
+
+val Project.android get() = extensions.getByName("android") as CommonExtension
+
+val Project.androidComponents: AndroidComponentsExtension<*, *, *>
+    get() = extensions.getByName("androidComponents") as AndroidComponentsExtension<*, *, *>
+
+fun Project.flxProvider(configuration: FlixclusiveProviderExtension.() -> Unit)
+    = extensions.getFlixclusive().configuration()
+
+fun Project.android(configuration: LibraryExtension.() -> Unit)
+    = extensions.getByName<LibraryExtension>("android").configuration()
 
 internal fun Project.createProviderManifest(): ProviderManifest {
     val extension = this.extensions.getFlixclusive()

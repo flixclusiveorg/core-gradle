@@ -20,15 +20,16 @@ dependencies {
     compileOnly(gradleApi())
     compileOnly(libs.guava)
     compileOnly(libs.android.tools.sdk)
+    compileOnly(libs.android.sdklib)
+
     compileOnly(libs.android.tools.gradle)
-    compileOnly(libs.kotlin.gradle.plugin)
 
     implementation(libs.asm)
     implementation(libs.asm.tree)
-    implementation(libs.jadb)
     implementation(libs.coreStubs.model.provider)
+
+    implementation(libs.jadb)
     implementation(libs.compose.compiler.gradle.plugin)
-    implementation(libs.shadow.gradle.plugin)
 }
 
 gradlePlugin {
@@ -42,11 +43,11 @@ gradlePlugin {
 
 val sourcesJar = tasks.register<Jar>("sourcesJar") {
     archiveClassifier.set("sources")
-    from("src/main/kotlin")
+    from(sourceSets["main"].allSource)
 }
 
 group = "com.github.flixclusive"
-version = "1.2.8"
+version = "1.3.0"
 
 publishing {
     repositories {
@@ -55,6 +56,7 @@ publishing {
 
     publications {
         create<MavenPublication>("release") {
+            from(components["java"])
             artifact(sourcesJar)
         }
     }

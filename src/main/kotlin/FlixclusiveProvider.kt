@@ -16,12 +16,25 @@
 import com.android.build.api.dsl.LibraryExtension
 import com.flixclusive.gradle.FLX_PROVIDER_EXTENSION_NAME
 import com.flixclusive.gradle.FlixclusiveProviderExtension
-import com.flixclusive.gradle.configuration.registerConfigurations
-import com.flixclusive.gradle.task.registerTasks
+import com.flixclusive.gradle.getFlixclusive
+import com.flixclusive.gradle.task.AlignTask
+import com.flixclusive.gradle.task.CompileDexTask.Companion.registerCompileDexTask
+import com.flixclusive.gradle.task.CompileResourcesTask.Companion.registerCompileResourcesTask
+import com.flixclusive.gradle.task.DeployWithAdbTask
+import com.flixclusive.gradle.task.GenerateUpdaterJsonTask
+import com.flixclusive.gradle.task.GenerateUpdaterJsonTask.Companion.registerGenerateUpdaterJsonTask
+import com.flixclusive.gradle.util.Constants
 import com.flixclusive.gradle.util.configureAndroid
+import com.flixclusive.gradle.util.createProviderManifest
+import com.flixclusive.gradle.util.isValidFilename
+import groovy.json.JsonBuilder
+import groovy.json.JsonGenerator
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.tasks.bundling.Zip
+import org.gradle.api.tasks.bundling.ZipEntryCompression
 import org.gradle.kotlin.dsl.configure
+import org.gradle.kotlin.dsl.register
 
 @Suppress("unused")
 abstract class FlixclusiveProvider : Plugin<Project> {
@@ -30,18 +43,114 @@ abstract class FlixclusiveProvider : Plugin<Project> {
             with(pluginManager) {
                 apply("com.android.library")
                 apply("org.jetbrains.kotlin.plugin.compose")
-                apply("com.gradleup.shadow")
             }
 
-            extensions.create(FLX_PROVIDER_EXTENSION_NAME, FlixclusiveProviderExtension::class.java, project)
+            extensions.create(
+                FLX_PROVIDER_EXTENSION_NAME,
+                FlixclusiveProviderExtension::class.java,
+                project
+            )
 
 
             extensions.configure<LibraryExtension> {
-                configureAndroid(commonExtension = this@configure)
+                configureAndroid(libraryExtension = this@configure)
+            }
+
+            registerTasks()
+        }
+    }
+
+    private fun Project.registerTasks() {
+        val extension = extensions.getFlixclusive()
+        val intermediates = layout.buildDirectory.dir("intermediates")
+        val providerClassFile = intermediates.get().file("providerClass")
+        val compileDexTask = registerCompileDexTask(providerClassFile)
+        val compileResourcesTask = registerCompileResourcesTask()
+        val generateUpdaterJsonTask = registerGenerateUpdaterJsonTask()
+
+        val packageTask = tasks.register<Zip>("package") {
+            group = Constants.TASK_GROUP
+            entryCompression = ZipEntryCompression.STORED
+            isPreserveFileTimestamps = false
+            archiveBaseName.set("$name-unaligned")
+            archiveVersion.set("")
+            archiveExtension.set(Constants.PROVIDER_EXTENSION)
+            destinationDirectory.set(intermediates)
+
+            val manifestFile = intermediates.get().file("manifest.json")
+            from(manifestFile)
+            doFirst {
+                if (!isValidFilename(name)) {
+                    throw IllegalStateException("Invalid project name: $name")
+                }
+
+                val (versionCode, _) = extension.getVersionDetails()
+                require(versionCode > 0L) {
+                    "No provider version is set"
+                }
+
+                if (extension.providerClassName == null) {
+                    if (providerClassFile.asFile.exists()) {
+                        extension.providerClassName = providerClassFile.asFile.readText()
+                    }
+                }
+
+                require(extension.providerClassName != null) {
+                    "No provider class found, make sure your provider class is annotated with @FlixclusiveProvider"
+                }
+
+                manifestFile.asFile.writeText(
+                    JsonBuilder(
+                        project.createProviderManifest(),
+                        JsonGenerator.Options()
+                            .excludeNulls()
+                            .build()
+                    ).toPrettyString()
+                )
+            }
+
+            from(compileDexTask.map { it.outputs.files })
+
+            if (extension.requiresResources) {
+                val resourcesFile = compileResourcesTask.flatMap { it.outputFile }
+                val resourcesFileTree = project.zipTree(resourcesFile)
+                val resources = resourcesFile.map {
+                    if (it.asFile.exists()) {
+                        resourcesFileTree
+                    } else {
+                        emptyList()
+                    }
+                }
+
+                from(resources) {
+                    exclude("AndroidManifest.xml")
+                }
             }
         }
 
-        registerTasks(project)
-        registerConfigurations(project)
+        val makeTask = tasks.register<AlignTask>("make") {
+            group = Constants.TASK_GROUP
+            inputZip.fileProvider(packageTask.map { it.outputs.files.singleFile })
+            outputZip.set(layout.buildDirectory.file("${project.name}.${Constants.PROVIDER_EXTENSION}"))
+
+            doLast {
+                logger.lifecycle("Provider package ${name}.flx created at ${outputs.files.singleFile}")
+            }
+        }
+
+        tasks.register<DeployWithAdbTask>("deployWithAdb") {
+            group = Constants.TASK_GROUP
+            providerFile.fileProvider(makeTask.map { it.outputs.files.singleFile })
+            updaterJsonFile.fileProvider(generateUpdaterJsonTask.map { it.outputs.files.singleFile })
+        }
+
+        if (rootProject.tasks.findByName("generateUpdaterJson") == null) {
+            rootProject.tasks.register("generateUpdaterJson", GenerateUpdaterJsonTask::class.java) {
+                group = Constants.TASK_GROUP
+
+                outputs.upToDateWhen { false }
+                outputFile.set(this@register.project.layout.buildDirectory.asFile.get().resolve("updater.json"))
+            }
+        }
     }
 }

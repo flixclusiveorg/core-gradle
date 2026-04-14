@@ -16,14 +16,17 @@
 package com.flixclusive.gradle.task
 
 import com.flixclusive.gradle.findFlixclusive
+import com.flixclusive.gradle.util.Constants
 import com.flixclusive.gradle.util.createProviderMetadata
 import com.flixclusive.model.provider.ProviderMetadata
 import groovy.json.JsonBuilder
 import groovy.json.JsonGenerator
 import org.gradle.api.DefaultTask
+import org.gradle.api.Project
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
+import org.gradle.api.tasks.TaskProvider
 import java.util.LinkedList
 
 internal abstract class GenerateUpdaterJsonTask : DefaultTask() {
@@ -86,5 +89,16 @@ internal abstract class GenerateUpdaterJsonTask : DefaultTask() {
         )
 
         logger.lifecycle("Created ${outputFile.asFile.get()}")
+    }
+
+    companion object {
+        fun Project.registerGenerateUpdaterJsonTask(): TaskProvider<GenerateUpdaterJsonTask> {
+            return tasks.register("generateUpdaterJson", GenerateUpdaterJsonTask::class.java) {
+                group = Constants.TASK_GROUP
+
+                outputs.upToDateWhen { false }
+                outputFile.set(layout.buildDirectory.file(Constants.UPDATER_JSON))
+            }
+        }
     }
 }
