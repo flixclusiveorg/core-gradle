@@ -148,7 +148,7 @@ abstract class CompileDexTask : DefaultTask() {
         private val ILLEGAL_PREFIXES = listOf("androidx.", "android", "org.jetbrains.kotlin")
 
         fun Project.registerCompileDexTask(providerClassFile: RegularFile): TaskProvider<CompileDexTask> {
-            val intermediates = project.layout.buildDirectory.dir("intermediates")
+            val intermediates = layout.buildDirectory.dir("intermediates")
 
             return tasks.register<CompileDexTask>("compileDex") {
                 group = Constants.TASK_GROUP
@@ -178,10 +178,10 @@ abstract class CompileDexTask : DefaultTask() {
                     }
                 )
 
-                input.from(project.tasks.named("compileDebugKotlin")) // exists but empty dir = no contribution
+                input.from(tasks.named("compileDebugKotlin")) // exists but empty dir = no contribution
                 input.from(
                     try {
-                        project.tasks.named("compileDebugJavaWithJavac") // this is what actually feeds classes in
+                        tasks.named("compileDebugJavaWithJavac") // this is what actually feeds classes in
                     } catch (_: UnknownDomainObjectException) {
                         null
                     }
