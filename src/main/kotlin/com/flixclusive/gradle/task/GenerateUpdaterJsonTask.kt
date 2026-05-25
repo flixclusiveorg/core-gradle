@@ -19,15 +19,12 @@ import com.flixclusive.gradle.findFlixclusive
 import com.flixclusive.gradle.util.Constants
 import com.flixclusive.gradle.util.createProviderMetadata
 import com.flixclusive.model.provider.ProviderMetadata
-import groovy.json.JsonBuilder
-import groovy.json.JsonGenerator
+import kotlinx.serialization.json.Json
 import org.gradle.api.DefaultTask
 import org.gradle.api.Project
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
-import org.gradle.api.tasks.TaskProvider
-import java.util.LinkedList
 
 internal abstract class GenerateUpdaterJsonTask : DefaultTask() {
     @get:OutputFile
@@ -79,21 +76,20 @@ internal abstract class GenerateUpdaterJsonTask : DefaultTask() {
             }
         }
 
-        outputFile.asFile.get().writeText(
-            JsonBuilder(
-                /* content = */ list,
-                /* generator = */ JsonGenerator.Options()
-                    .excludeNulls()
-                    .build()
-            ).toPrettyString()
-        )
+        val jsonString = Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = true
+        }.encodeToString(list)
+        outputFile.asFile.get().writeText(jsonString)
 
         logger.lifecycle("Created ${outputFile.asFile.get()}")
     }
 
     companion object {
-        fun Project.registerGenerateUpdaterJsonTask(): TaskProvider<GenerateUpdaterJsonTask> {
-            return tasks.register("generateUpdaterJson", GenerateUpdaterJsonTask::class.java) {
+        fun Project.registerGenerateUpdaterJsonTask() {
+            if (tasks.findByName("generateUpdaterJson") != null) return
+
+            tasks.register("generateUpdaterJson", GenerateUpdaterJsonTask::class.java) {
                 group = Constants.TASK_GROUP
 
                 outputs.upToDateWhen { false }

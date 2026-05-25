@@ -17,13 +17,12 @@ package com.flixclusive.gradle
 
 import com.flixclusive.model.provider.Author
 import com.flixclusive.model.provider.Language
+import com.flixclusive.model.provider.ProviderStatus
 import com.flixclusive.model.provider.ProviderType
 import com.flixclusive.model.provider.Repository.Companion.toValidRepositoryLink
-import com.flixclusive.model.provider.Status
 import org.gradle.api.Project
 import org.gradle.api.plugins.ExtensionContainer
 import org.gradle.api.provider.ListProperty
-import org.gradle.api.provider.Property
 import javax.inject.Inject
 
 const val FLX_PROVIDER_EXTENSION_NAME = "flxProvider"
@@ -102,7 +101,7 @@ abstract class FlixclusiveProviderExtension @Inject constructor(val project: Pro
      * - Language("en")
      *      - For specific languages only. NOTE: Use the language's short-hand code.
      */
-    var language: Language = Language(languageCode = "en")
+    var language: Language = Language(code = "en")
 
     /**
      * The main type that your provider supports.
@@ -124,12 +123,11 @@ abstract class FlixclusiveProviderExtension @Inject constructor(val project: Pro
      * The current status of this provider. Defaults to Beta.
      *
      * These are the possible values you could set:
-     * - Status.Beta
-     * - Status.Maintenance
-     * - Status.Down
-     * - Status.Working
+     * - ProviderStatus.Beta
+     * - ProviderStatus.Down
+     * - ProviderStatus.Working
      */
-    var status: Status = Status.Beta
+    var status: ProviderStatus = ProviderStatus.Beta
 
     /**
      *

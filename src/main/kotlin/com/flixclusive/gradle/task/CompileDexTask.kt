@@ -40,6 +40,7 @@ import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.SkipWhenEmpty
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.TaskProvider
+import org.gradle.kotlin.dsl.get
 import org.gradle.kotlin.dsl.register
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.tree.ClassNode
@@ -64,7 +65,8 @@ abstract class CompileDexTask : DefaultTask() {
     fun compileDex() {
         val androidComponents = project.androidComponents
         val minSdk = project.android.defaultConfig.minSdk ?: Constants.MINIMUM_SDK_VERSION
-        val globalSyntheticsDir = outputDir.get().asFile.resolve("global-synthetics").also { it.mkdirs() }
+        val globalSyntheticsDir =
+            outputDir.get().asFile.resolve("global-synthetics").also { it.mkdirs() }
         val paths = androidComponents.sdkComponents.bootClasspath.get().map { file ->
             file.asFile.toPath()
         }
@@ -75,7 +77,7 @@ abstract class CompileDexTask : DefaultTask() {
         val dexBuilder = DexArchiveBuilder.createD8DexBuilder(
             DexParameters(
                 minSdkVersion = minSdk,
-                debuggable = true,
+                debuggable = false,
                 dexPerClass = false,
                 withDesugaring = true,
                 desugarBootclasspath = bootClasspath,
@@ -92,8 +94,19 @@ abstract class CompileDexTask : DefaultTask() {
         try {
             outputDir.get().asFile.mkdirs()
 
-            val fileStreams = input.files
+            val files = input.files
                 .filter(File::exists)
+                .filterNot {
+                    DISALLOWED_BUNDLES.any { disallowed ->
+                        it.absolutePath.contains(disallowed, ignoreCase = true)
+                    }
+                }
+
+            files.forEach {
+                logger.lifecycle("Adding ${it.absolutePath} to dex input")
+            }
+
+            val fileStreams = files
                 .map { path ->
                     ClassFileInputs
                         .fromPath(path.toPath())
@@ -145,37 +158,29 @@ abstract class CompileDexTask : DefaultTask() {
     }
 
     companion object {
-        private val ILLEGAL_PREFIXES = listOf("androidx.", "android", "org.jetbrains.kotlin")
-
+        private val DISALLOWED_BUNDLES = setOf("kotlin-stdlib")
         fun Project.registerCompileDexTask(providerClassFile: RegularFile): TaskProvider<CompileDexTask> {
             val intermediates = layout.buildDirectory.dir("intermediates")
 
             return tasks.register<CompileDexTask>("compileDex") {
                 group = Constants.TASK_GROUP
+
                 this@register.providerClassFile.set(providerClassFile)
                 outputDir.set(intermediates.map { it.dir("dex") })
 
-                // Since the `implementation` is non-resolvable, wrap it in another configuration
-                @Suppress("UnstableApiUsage")
-                val implementationArtifacts = configurations.register("implementationArtifacts") {
-                    isCanBeResolved = true // Allow resolving artifacts
-                    isCanBeConsumed = false // Limited to this project
-                    isCanBeDeclared = false // No new artifacts can be added
-                    extendsFrom(configurations.getByName("implementation"))
-                }
+                val artifacts = configurations["debugRuntimeClasspath"]
 
-                // Collect all dependencies as jars
-                // `.aar` will have artifact transformers applied to extract their inner `classes.jar`
                 input.from(
-                    implementationArtifacts.map { configuration ->
-                        configuration.incoming
-                            .artifactView {
-                                attributes.attribute(
+                    artifacts.incoming
+                        .artifactView {
+                            attributes {
+                                attribute(
                                     ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE,
-                                    ArtifactTypeDefinition.JAR_TYPE)
+                                    ArtifactTypeDefinition.JAR_TYPE,
+                                )
                             }
-                            .files
-                    }
+                        }
+                        .files
                 )
 
                 input.from(tasks.named("compileDebugKotlin")) // exists but empty dir = no contribution
@@ -186,21 +191,6 @@ abstract class CompileDexTask : DefaultTask() {
                         null
                     }
                 )
-
-                implementationArtifacts.configure {
-                    incoming.afterResolve {
-                        resolutionResult.allComponents.forEach { component ->
-                            val module = component.moduleVersion ?: return@forEach
-                            if (ILLEGAL_PREFIXES.any { module.group.startsWith(it) }) {
-                                logger.warn(
-                                    "${module.group}:${module.name} is defined as 'implementation'. It may cause " +
-                                            "file size bloatedness and potential reflection conflicts. Please use " +
-                                            "'compileOnly' instead if you only need the dependency for compilation and not at runtime."
-                                )
-                            }
-                        }
-                    }
-                }
             }
         }
     }

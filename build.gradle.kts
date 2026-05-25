@@ -24,6 +24,8 @@ dependencies {
 
     compileOnly(libs.android.tools.gradle)
 
+    implementation(libs.kotlinx.serialization.json)
+
     implementation(libs.asm)
     implementation(libs.asm.tree)
     implementation(libs.coreStubs.model.provider)
@@ -47,7 +49,7 @@ val sourcesJar = tasks.register<Jar>("sourcesJar") {
 }
 
 group = "com.github.flixclusive"
-version = "1.3.0"
+version = "1.4.0"
 
 publishing {
     repositories {

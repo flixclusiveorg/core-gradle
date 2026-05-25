@@ -14,6 +14,7 @@
  */
 
 import com.android.build.api.dsl.LibraryExtension
+import com.android.build.api.variant.Variant
 import com.flixclusive.gradle.FLX_PROVIDER_EXTENSION_NAME
 import com.flixclusive.gradle.FlixclusiveProviderExtension
 import com.flixclusive.gradle.getFlixclusive
@@ -24,11 +25,11 @@ import com.flixclusive.gradle.task.DeployWithAdbTask
 import com.flixclusive.gradle.task.GenerateUpdaterJsonTask
 import com.flixclusive.gradle.task.GenerateUpdaterJsonTask.Companion.registerGenerateUpdaterJsonTask
 import com.flixclusive.gradle.util.Constants
+import com.flixclusive.gradle.util.androidComponents
 import com.flixclusive.gradle.util.configureAndroid
 import com.flixclusive.gradle.util.createProviderManifest
 import com.flixclusive.gradle.util.isValidFilename
-import groovy.json.JsonBuilder
-import groovy.json.JsonGenerator
+import kotlinx.serialization.json.Json
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.tasks.bundling.Zip
@@ -66,7 +67,16 @@ abstract class FlixclusiveProvider : Plugin<Project> {
         val providerClassFile = intermediates.get().file("providerClass")
         val compileDexTask = registerCompileDexTask(providerClassFile)
         val compileResourcesTask = registerCompileResourcesTask()
-        val generateUpdaterJsonTask = registerGenerateUpdaterJsonTask()
+        registerGenerateUpdaterJsonTask()
+
+        if (rootProject.tasks.findByName("generateUpdaterJson") == null) {
+            rootProject.tasks.register<GenerateUpdaterJsonTask>("generateUpdaterJson") {
+                group = Constants.TASK_GROUP
+
+                outputs.upToDateWhen { false }
+                outputFile.set(this@register.project.layout.buildDirectory.asFile.get().resolve("updater.json"))
+            }
+        }
 
         val packageTask = tasks.register<Zip>("package") {
             group = Constants.TASK_GROUP
@@ -100,12 +110,10 @@ abstract class FlixclusiveProvider : Plugin<Project> {
                 }
 
                 manifestFile.asFile.writeText(
-                    JsonBuilder(
-                        project.createProviderManifest(),
-                        JsonGenerator.Options()
-                            .excludeNulls()
-                            .build()
-                    ).toPrettyString()
+                    Json {
+                        ignoreUnknownKeys = true
+                        encodeDefaults = true
+                    }.encodeToString(project.createProviderManifest())
                 )
             }
 
@@ -138,18 +146,17 @@ abstract class FlixclusiveProvider : Plugin<Project> {
             }
         }
 
-        tasks.register<DeployWithAdbTask>("deployWithAdb") {
-            group = Constants.TASK_GROUP
-            providerFile.fileProvider(makeTask.map { it.outputs.files.singleFile })
-            updaterJsonFile.fileProvider(generateUpdaterJsonTask.map { it.outputs.files.singleFile })
-        }
+        afterEvaluate {
+            val rootGenerateUpdaterJsonTask = rootProject.tasks.findByName("generateUpdaterJson") as? GenerateUpdaterJsonTask
 
-        if (rootProject.tasks.findByName("generateUpdaterJson") == null) {
-            rootProject.tasks.register("generateUpdaterJson", GenerateUpdaterJsonTask::class.java) {
+            tasks.register<DeployWithAdbTask>("deployWithAdb") {
                 group = Constants.TASK_GROUP
 
-                outputs.upToDateWhen { false }
-                outputFile.set(this@register.project.layout.buildDirectory.asFile.get().resolve("updater.json"))
+                providerFile.fileProvider(makeTask.map { it.outputs.files.singleFile })
+                rootGenerateUpdaterJsonTask?.let {
+                    updaterJsonFile.set { it.outputs.files.singleFile }
+                    dependsOn(makeTask, rootGenerateUpdaterJsonTask)
+                }
             }
         }
     }
