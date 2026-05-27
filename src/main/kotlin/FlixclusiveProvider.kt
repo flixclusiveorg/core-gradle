@@ -14,7 +14,6 @@
  */
 
 import com.android.build.api.dsl.LibraryExtension
-import com.android.build.api.variant.Variant
 import com.flixclusive.gradle.FLX_PROVIDER_EXTENSION_NAME
 import com.flixclusive.gradle.FlixclusiveProviderExtension
 import com.flixclusive.gradle.getFlixclusive
@@ -25,7 +24,7 @@ import com.flixclusive.gradle.task.DeployWithAdbTask
 import com.flixclusive.gradle.task.GenerateUpdaterJsonTask
 import com.flixclusive.gradle.task.GenerateUpdaterJsonTask.Companion.registerGenerateUpdaterJsonTask
 import com.flixclusive.gradle.util.Constants
-import com.flixclusive.gradle.util.androidComponents
+import com.flixclusive.gradle.util.android
 import com.flixclusive.gradle.util.configureAndroid
 import com.flixclusive.gradle.util.createProviderManifest
 import com.flixclusive.gradle.util.isValidFilename
@@ -133,7 +132,13 @@ abstract class FlixclusiveProvider : Plugin<Project> {
                 from(resources) {
                     exclude("AndroidManifest.xml")
                 }
+
+                val mainSourceSet = android.sourceSets.getByName("main")
+                from(mainSourceSet.assets.directories) {
+                    into("assets")
+                }
             }
+
         }
 
         val makeTask = tasks.register<AlignTask>("make") {
