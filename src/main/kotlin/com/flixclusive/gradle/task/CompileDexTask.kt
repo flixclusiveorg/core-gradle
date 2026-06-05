@@ -77,7 +77,7 @@ abstract class CompileDexTask : DefaultTask() {
         val dexBuilder = DexArchiveBuilder.createD8DexBuilder(
             DexParameters(
                 minSdkVersion = minSdk,
-                debuggable = false,
+                debuggable = true,
                 dexPerClass = false,
                 withDesugaring = true,
                 desugarBootclasspath = bootClasspath,
