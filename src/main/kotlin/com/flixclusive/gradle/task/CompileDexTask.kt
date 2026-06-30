@@ -46,7 +46,6 @@ import org.objectweb.asm.ClassReader
 import org.objectweb.asm.tree.ClassNode
 import org.slf4j.LoggerFactory
 import java.io.File
-import java.nio.file.Path
 import java.util.stream.Collectors
 
 abstract class CompileDexTask : DefaultTask() {
@@ -54,6 +53,9 @@ abstract class CompileDexTask : DefaultTask() {
     @get:SkipWhenEmpty
     @get:IgnoreEmptyDirectories
     abstract val input: ConfigurableFileCollection
+
+    @get:InputFiles
+    abstract val desugarClasspathFiles: ConfigurableFileCollection
 
     @get:OutputDirectory
     abstract val outputDir: DirectoryProperty
@@ -72,7 +74,11 @@ abstract class CompileDexTask : DefaultTask() {
         }
 
         val bootClasspath = ClassFileProviderFactory(paths)
-        val classpath = ClassFileProviderFactory(listOf<Path>())
+        val classpath = ClassFileProviderFactory(
+            desugarClasspathFiles.files.filter { file ->
+                file.exists() && (file.isDirectory || file.extension in setOf("jar", "zip"))
+            }.map { it.toPath() }
+        )
 
         val dexBuilder = DexArchiveBuilder.createD8DexBuilder(
             DexParameters(
@@ -172,6 +178,19 @@ abstract class CompileDexTask : DefaultTask() {
 
                 input.from(
                     artifacts.incoming
+                        .artifactView {
+                            attributes {
+                                attribute(
+                                    ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE,
+                                    ArtifactTypeDefinition.JAR_TYPE,
+                                )
+                            }
+                        }
+                        .files
+                )
+
+                desugarClasspathFiles.from(
+                    configurations["debugCompileClasspath"].incoming
                         .artifactView {
                             attributes {
                                 attribute(
