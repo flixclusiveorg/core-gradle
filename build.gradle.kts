@@ -43,13 +43,15 @@ gradlePlugin {
     }
 }
 
-val sourcesJar = tasks.register<Jar>("sourcesJar") {
-    archiveClassifier.set("sources")
-    from(sourceSets["main"].allSource)
-}
+val sourcesJar =
+    tasks.register<Jar>("sourcesJar") {
+        description = "Assembles a jar archive containing the main sources."
+        archiveClassifier.set("sources")
+        from(sourceSets["main"].allSource)
+    }
 
 group = "com.github.flixclusive"
-version = "1.4.2"
+version = "1.5.0"
 
 publishing {
     repositories {

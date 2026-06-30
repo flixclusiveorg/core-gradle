@@ -35,12 +35,19 @@ import java.nio.charset.StandardCharsets
 
 internal abstract class DeployWithAdbTask : DefaultTask() {
     @get:Input
-    @set:Option(option = "wait-for-debugger", description = "Enables debugging flag when starting the main activity")
+    @set:Option(
+        option = "wait-for-debugger",
+        description = "Enables debugging flag when starting the main activity",
+    )
     var waitForDebugger: Boolean = false
 
     @get:Input
     @set:Option(option = "debug-app", description = "Load the provider on the debug app")
     var debugApp: Boolean = false
+
+    @get:Input
+    @set:Option(option = "preview-app", description = "Load the provider on the preview app")
+    var previewApp: Boolean = false
 
     @get:InputFile
     abstract val providerFile: RegularFileProperty
@@ -52,17 +59,21 @@ internal abstract class DeployWithAdbTask : DefaultTask() {
     fun deployWithAdb() {
         val androidComponents = project.androidComponents
         val sdkComponents = androidComponents.sdkComponents
-        val adbExecutable = sdkComponents.adb.get().asFile.absolutePath
+        val adbExecutable =
+            sdkComponents.adb
+                .get()
+                .asFile.absolutePath
 
         AdbServerLauncher(Subprocess(), adbExecutable).launch()
         val jadbConnection = JadbConnection()
-        val devices = jadbConnection.devices.filter {
-            try {
-                it.state == JadbDevice.State.Device
-            } catch (_: JadbException) {
-                false
+        val devices =
+            jadbConnection.devices.filter {
+                try {
+                    it.state == JadbDevice.State.Device
+                } catch (_: JadbException) {
+                    false
+                }
             }
-        }
 
         require(devices.size == 1) {
             "Only one ADB device should be connected, but ${devices.size} were!"
@@ -74,9 +85,14 @@ internal abstract class DeployWithAdbTask : DefaultTask() {
             return
         }
 
-        val activityPath = if (debugApp) {
-            "com.flixclusive.debug/com.flixclusive.mobile.MobileActivity"
-        } else "com.flixclusive/com.flixclusive.mobile.MobileActivity"
+        val activityPath =
+            if (debugApp) {
+                "com.flixclusive.debug/com.flixclusive.mobile.MobileActivity"
+            } else if (previewApp) {
+                "com.flixclusive.preview/com.flixclusive.mobile.MobileActivity"
+            } else {
+                "com.flixclusive/com.flixclusive.mobile.MobileActivity"
+            }
 
         val args = arrayListOf("start", "-S", "-n", activityPath)
 
@@ -84,9 +100,11 @@ internal abstract class DeployWithAdbTask : DefaultTask() {
             args.add("-D")
         }
 
-        val response = String(
-            device.executeShell("am", *args.toTypedArray()).readAllBytes(), StandardCharsets.UTF_8
-        )
+        val response =
+            String(
+                device.executeShell("am", *args.toTypedArray()).readAllBytes(),
+                StandardCharsets.UTF_8,
+            )
 
         if (response.contains("Error")) {
             logger.error(response)
@@ -95,11 +113,14 @@ internal abstract class DeployWithAdbTask : DefaultTask() {
         logger.lifecycle("Deployed to ${device.serial}")
     }
 
-
     private fun pushProviderToLocalStorage(device: JadbDevice): Boolean {
         val providerFile = providerFile.asFile.get()
         val updaterJson = updaterJsonFile.asFile.get()
-        val repository = project.extensions.getFlixclusive().repositoryUrl?.toValidRepositoryLink()
+        val repository =
+            project.extensions
+                .getFlixclusive()
+                .repositoryUrl
+                ?.toValidRepositoryLink()
 
         if (repository == null) {
             logger.error("Repository URL has not been set. Please set it on the project-level build.gradle.kts file")
@@ -112,14 +133,12 @@ internal abstract class DeployWithAdbTask : DefaultTask() {
             device.push(
                 files = listOf(providerFile, updaterJson),
                 sanitizedFolderName = folderName,
-                isDebug = debugApp
             )
         } catch (_: JadbException) {
             device.push(
                 files = listOf(providerFile, updaterJson),
                 sanitizedFolderName = folderName,
-                isDebug = debugApp,
-                useOldStorage = true
+                useOldStorage = true,
             )
         }
 
@@ -129,16 +148,16 @@ internal abstract class DeployWithAdbTask : DefaultTask() {
     private fun JadbDevice.push(
         files: List<File>,
         sanitizedFolderName: String,
-        isDebug: Boolean,
-        useOldStorage: Boolean = false
+        useOldStorage: Boolean = false,
     ) {
-        val initialPath = when (useOldStorage) {
-            true -> if (isDebug) OLD_DEBUG_LOCAL_FILE_PATH else OLD_LOCAL_FILE_PATH
-            false -> if (isDebug) DEBUG_LOCAL_FILE_PATH else LOCAL_FILE_PATH
-        }
+        val initialPath =
+            when (useOldStorage) {
+                true -> OLD_LOCAL_FILE_PATH
+                false -> LOCAL_FILE_PATH
+            }
 
         files.forEach { file ->
-            val remoteFilePath = "${initialPath}/${sanitizedFolderName}/${file.name}"
+            val remoteFilePath = "$initialPath/$sanitizedFolderName/${file.name}"
             push(file, RemoteFile(remoteFilePath))
 
             val fileName = files.first().nameWithoutExtension
@@ -147,13 +166,7 @@ internal abstract class DeployWithAdbTask : DefaultTask() {
     }
 
     companion object {
-        private const val LOCAL_DEBUG_FILE_PATH_SUFFIX = "com.flixclusive.debug/files/providers/debug"
-        private const val LOCAL_RELEASE_FILE_PATH_SUFFIX = "com.flixclusive/files/providers/debug"
-
-        private const val OLD_DEBUG_LOCAL_FILE_PATH = "/sdcard/Android/data/$LOCAL_DEBUG_FILE_PATH_SUFFIX"
-        private const val OLD_LOCAL_FILE_PATH = "/sdcard/Android/data/$LOCAL_RELEASE_FILE_PATH_SUFFIX"
-
-        private const val DEBUG_LOCAL_FILE_PATH = "/storage/emulated/0/Android/data/$LOCAL_DEBUG_FILE_PATH_SUFFIX"
-        private const val LOCAL_FILE_PATH = "/storage/emulated/0/Android/data/$LOCAL_RELEASE_FILE_PATH_SUFFIX"
+        private const val OLD_LOCAL_FILE_PATH = "/sdcard/Flixclusive/providers/debug"
+        private const val LOCAL_FILE_PATH = "/storage/emulated/0/Flixclusive/providers/debug"
     }
 }
