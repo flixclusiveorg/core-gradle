@@ -51,7 +51,7 @@ val sourcesJar =
     }
 
 group = "com.github.flixclusive"
-version = "1.5.1"
+version = "1.5.0"
 
 publishing {
     repositories {

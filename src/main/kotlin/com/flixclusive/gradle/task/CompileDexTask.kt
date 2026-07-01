@@ -33,10 +33,7 @@ import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFile
 import org.gradle.api.file.RegularFileProperty
-import org.gradle.api.provider.Property
-import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.IgnoreEmptyDirectories
-import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.OutputFile
@@ -60,9 +57,6 @@ abstract class CompileDexTask : DefaultTask() {
     @get:InputFiles
     abstract val desugarClasspathFiles: ConfigurableFileCollection
 
-    @get:Input
-    abstract val debuggable: Property<Boolean>
-
     @get:OutputDirectory
     abstract val outputDir: DirectoryProperty
 
@@ -79,30 +73,22 @@ abstract class CompileDexTask : DefaultTask() {
             file.asFile.toPath()
         }
 
-        val debug = debuggable.get()
-        logger.lifecycle("Compiling dex with debuggable=${debug}")
-
         val bootClasspath = ClassFileProviderFactory(paths)
-        val desugarPaths = desugarClasspathFiles.files
-            .takeIf { !debug } ?: emptyList()
         val classpath = ClassFileProviderFactory(
-            desugarPaths
-                .filter { file ->
-                    file.exists() && (file.isDirectory || file.extension in setOf("jar", "zip"))
-                }.map { it.toPath() }
+            desugarClasspathFiles.files.filter { file ->
+                file.exists() && (file.isDirectory || file.extension in setOf("jar", "zip"))
+            }.map { it.toPath() }
         )
-
-        logger.lifecycle("desugarPaths: ${desugarPaths.size}")
 
         val dexBuilder = DexArchiveBuilder.createD8DexBuilder(
             DexParameters(
                 minSdkVersion = minSdk,
-                debuggable = debug,
+                debuggable = true,
+                dexPerClass = false,
+                withDesugaring = true,
                 desugarBootclasspath = bootClasspath,
                 desugarClasspath = classpath,
                 coreLibDesugarConfig = null,
-                withDesugaring = true,
-                dexPerClass = false,
                 enableApiModeling = true,
                 messageReceiver = MessageReceiverImpl(
                     ErrorFormatMode.HUMAN_READABLE,
@@ -179,7 +165,6 @@ abstract class CompileDexTask : DefaultTask() {
 
     companion object {
         private val DISALLOWED_BUNDLES = setOf("kotlin-stdlib")
-
         fun Project.registerCompileDexTask(providerClassFile: RegularFile): TaskProvider<CompileDexTask> {
             val intermediates = layout.buildDirectory.dir("intermediates")
 
@@ -204,8 +189,6 @@ abstract class CompileDexTask : DefaultTask() {
                         .files
                 )
 
-                debuggable.set(isDebugging())
-
                 desugarClasspathFiles.from(
                     configurations["debugCompileClasspath"].incoming
                         .artifactView {
@@ -227,19 +210,6 @@ abstract class CompileDexTask : DefaultTask() {
                         null
                     }
                 )
-            }
-        }
-
-        private fun Project.isDebugging(): Provider<Boolean> {
-            return provider {
-                if (gradle.taskGraph.hasTask(":deployWithAdb") ||
-                    gradle.taskGraph.allTasks.any { it.name == "deployWithAdb" }) {
-                    gradle.taskGraph.allTasks
-                        .filterIsInstance<DeployWithAdbTask>()
-                        .any { it.debugApp }
-                } else {
-                    false
-                }
             }
         }
     }
